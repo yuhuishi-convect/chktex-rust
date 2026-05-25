@@ -1,0 +1,13 @@
+[package]
+name = "chktex-cli"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "chktex"
+path = "src/main.rs"
+
+[dependencies]
+chktex-core = { path = "../chktex-core" }

@@ -1,0 +1,16 @@
+[workspace]
+members = [
+    "crates/chktex-core",
+    "crates/chktex-cli",
+]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+license = "GPL-2.0-or-later"
+repository = "https://git.savannah.nongnu.org/git/chktex.git"
+
+[workspace.dependencies]
+fancy-regex = "0.18"
+regex = "1.12"
+thiserror = "2"
