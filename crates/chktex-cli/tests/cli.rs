@@ -13,13 +13,13 @@ fn version_flag_succeeds() {
 }
 
 #[test]
-fn help_flag_succeeds() {
+fn help_flag_matches_upstream_status_and_channel() {
     let output = Command::new(env!("CARGO_BIN_EXE_chktex"))
         .arg("--help")
         .output()
         .expect("run chktex");
 
-    assert!(output.status.success());
-    assert!(String::from_utf8_lossy(&output.stdout).contains("Usage: chktex"));
-    assert!(output.stderr.is_empty());
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Usage of ChkTeX"));
 }

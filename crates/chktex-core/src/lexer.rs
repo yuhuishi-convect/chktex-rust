@@ -65,7 +65,7 @@ impl<'a> Lexer<'a> {
                 b']' => self.single(TokenKind::EndOptional),
                 b'$' => self.math_shift(),
                 b'.' | b',' | b';' | b':' | b'!' | b'?' | b'`' | b'\'' | b'(' | b')' | b'-'
-                | b'~' => self.single(TokenKind::Punctuation(byte)),
+                | b'~' | b'^' | b'_' | b'#' | b'&' => self.single(TokenKind::Punctuation(byte)),
                 _ => self.text(),
             }
         }
@@ -193,6 +193,10 @@ fn is_special(byte: u8) -> bool {
             | b')'
             | b'-'
             | b'~'
+            | b'^'
+            | b'_'
+            | b'#'
+            | b'&'
     )
 }
 

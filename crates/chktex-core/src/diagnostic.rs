@@ -21,6 +21,7 @@ pub struct Diagnostic {
     pub kind: DiagnosticKind,
     pub file: String,
     pub line: i64,
+    pub sort_line: Option<i64>,
     pub column: usize,
     pub len: usize,
     pub message: String,
@@ -43,6 +44,7 @@ impl Diagnostic {
             kind,
             file: file.into(),
             line,
+            sort_line: None,
             column,
             len,
             message: message.into(),
@@ -71,69 +73,86 @@ impl FormatOptions {
 }
 
 pub fn format_diagnostic(diagnostic: &Diagnostic, options: &FormatOptions) -> String {
-    let mut out = String::new();
+    String::from_utf8_lossy(&format_diagnostic_bytes(diagnostic, options)).into_owned()
+}
+
+pub fn format_diagnostic_bytes(diagnostic: &Diagnostic, options: &FormatOptions) -> Vec<u8> {
+    let mut out = Vec::new();
     let mut chars = options.format.chars();
 
     while let Some(ch) = chars.next() {
         if ch != '%' {
-            out.push(ch);
+            push_char(&mut out, ch);
             continue;
         }
 
         let Some(code) = chars.next() else {
-            out.push('%');
+            out.push(b'%');
             break;
         };
 
         match code {
-            'b' => out.push_str(&options.delimiter),
-            'c' => out.push_str(&(diagnostic.column + 1).to_string()),
-            'd' => out.push_str(&diagnostic.len.to_string()),
-            'f' => out.push_str(&diagnostic.file),
-            'i' => out.push_str(&options.reverse_on),
-            'I' => out.push_str(&options.reverse_off),
-            'k' => out.push_str(diagnostic.kind.as_str()),
-            'l' => out.push_str(&diagnostic.line.to_string()),
-            'm' => out.push_str(&diagnostic.message),
-            'n' => out.push_str(&diagnostic.number.to_string()),
-            'u' => out.push_str(&underline(diagnostic.column, diagnostic.len)),
-            'r' => out.push_str(&lossy_slice(&diagnostic.source, 0, diagnostic.column)),
-            's' => out.push_str(&lossy_slice(
+            'b' => out.extend_from_slice(options.delimiter.as_bytes()),
+            'c' => out.extend_from_slice((diagnostic.column + 1).to_string().as_bytes()),
+            'd' => out.extend_from_slice(diagnostic.len.to_string().as_bytes()),
+            'f' => out.extend_from_slice(diagnostic.file.as_bytes()),
+            'i' => out.extend_from_slice(options.reverse_on.as_bytes()),
+            'I' => out.extend_from_slice(options.reverse_off.as_bytes()),
+            'k' => out.extend_from_slice(diagnostic.kind.as_str().as_bytes()),
+            'l' => out.extend_from_slice(diagnostic.line.to_string().as_bytes()),
+            'm' => out.extend_from_slice(message_bytes(diagnostic).as_slice()),
+            'n' => out.extend_from_slice(diagnostic.number.to_string().as_bytes()),
+            'u' => out.extend_from_slice(&underline_bytes(diagnostic.column, diagnostic.len)),
+            'r' => out.extend_from_slice(raw_slice(&diagnostic.source, 0, diagnostic.column)),
+            's' => out.extend_from_slice(raw_slice(
                 &diagnostic.source,
                 diagnostic.column,
                 diagnostic.len,
             )),
-            't' => out.push_str(&lossy_tail(
+            't' => out.extend_from_slice(raw_tail(
                 &diagnostic.source,
                 diagnostic.column.saturating_add(diagnostic.len),
             )),
-            other => out.push(other),
+            other => push_char(&mut out, other),
         }
     }
 
     out
 }
 
-fn underline(column: usize, len: usize) -> String {
+fn push_char(out: &mut Vec<u8>, ch: char) {
+    let mut buf = [0; 4];
+    out.extend_from_slice(ch.encode_utf8(&mut buf).as_bytes());
+}
+
+fn message_bytes(diagnostic: &Diagnostic) -> Vec<u8> {
+    if diagnostic.number == 19 {
+        b"Use \"'\" (ASCII 39) instead  of \"\xB4\" (ASCII 180).".to_vec()
+    } else {
+        diagnostic.message.as_bytes().to_vec()
+    }
+}
+
+fn underline_bytes(column: usize, len: usize) -> Vec<u8> {
     let mut out = String::with_capacity(column.saturating_add(len));
     out.extend(std::iter::repeat_n(' ', column));
     out.extend(std::iter::repeat_n('^', len));
-    out
+    out.into_bytes()
 }
 
-fn lossy_slice(bytes: &[u8], start: usize, len: usize) -> String {
+fn raw_slice(bytes: &[u8], start: usize, len: usize) -> &[u8] {
     if start >= bytes.len() {
-        return String::new();
+        return &[];
     }
     let end = start.saturating_add(len).min(bytes.len());
-    String::from_utf8_lossy(&bytes[start..end]).into_owned()
+    &bytes[start..end]
 }
 
-fn lossy_tail(bytes: &[u8], start: usize) -> String {
+fn raw_tail(bytes: &[u8], start: usize) -> &[u8] {
     if start >= bytes.len() {
-        return String::new();
+        return &[];
     }
-    String::from_utf8_lossy(&bytes[start..]).into_owned()
+    &bytes[start..]
 }
 
 #[cfg(test)]

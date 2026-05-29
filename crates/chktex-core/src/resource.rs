@@ -13,7 +13,20 @@ impl ResourceSet {
     }
 
     pub fn merge(&mut self, other: ResourceSet) {
-        self.entries.extend(other.entries);
+        for (key, incoming) in other.entries {
+            if key == "cmdline" {
+                let entry = self.entries.entry(key).or_default();
+                if incoming.value.is_some() {
+                    entry.value = incoming.value;
+                }
+                entry.list.extend(incoming.list);
+                entry
+                    .case_insensitive_list
+                    .extend(incoming.case_insensitive_list);
+            } else {
+                self.entries.insert(key, incoming);
+            }
+        }
     }
 
     fn entry_mut(&mut self, key: &str) -> &mut ResourceEntry {
@@ -493,6 +506,17 @@ Silent = { \bf }
         .unwrap();
 
         assert_eq!(resources.get("Silent").unwrap().list, [r"\bf"]);
+    }
+
+    #[test]
+    fn merge_appends_cmdline_entries() {
+        let mut resources = parse_resource("CmdLine { -n36 }\n").unwrap();
+        resources.merge(parse_resource("CmdLine { -r -q -v0 }\n").unwrap());
+
+        assert_eq!(
+            resources.get("CmdLine").unwrap().list,
+            ["-n36", "-r", "-q", "-v0"]
+        );
     }
 
     #[test]

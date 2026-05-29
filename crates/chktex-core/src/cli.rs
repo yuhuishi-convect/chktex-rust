@@ -59,6 +59,7 @@ impl Default for CliOptions {
 pub enum CliAction {
     Check,
     Help,
+    License,
     Version,
 }
 
@@ -158,10 +159,10 @@ impl Parser {
         match name {
             "help" => self.options.action = CliAction::Help,
             "version" => self.options.action = CliAction::Version,
-            "license" => self.options.license = true,
+            "license" => self.options.action = CliAction::License,
             "nolinesupp" => self.options.no_line_suppression = true,
             "quiet" => self.options.quiet = true,
-            "reset" => self.options.reset = true,
+            "reset" => self.reset_runtime_options(),
             "localrc" => {
                 let value = self.required_long_arg(name, inline_value)?;
                 self.options.local_rc_files.push(PathBuf::from(value));
@@ -236,10 +237,10 @@ impl Parser {
             match flag {
                 'h' => self.options.action = CliAction::Help,
                 'W' => self.options.action = CliAction::Version,
-                'i' => self.options.license = true,
+                'i' => self.options.action = CliAction::License,
                 'L' => self.options.no_line_suppression = true,
                 'q' => self.options.quiet = true,
-                'r' => self.options.reset = true,
+                'r' => self.reset_runtime_options(),
                 'l' => {
                     let value = self.required_short_arg('l', rest)?;
                     rest = "";
@@ -291,7 +292,7 @@ impl Parser {
                     rest = consume_numeric_or_all(rest);
                 }
                 'd' => {
-                    let (value, next) = parse_number_prefix(rest);
+                    let (value, next) = self.optional_short_number(rest);
                     self.options.debug_level = Some(value.unwrap_or(0xffff));
                     rest = next;
                 }
@@ -306,32 +307,32 @@ impl Parser {
                     rest = next;
                 }
                 'b' => {
-                    let (value, next) = parse_bool_prefix(rest, false);
+                    let (value, next) = self.optional_short_bool(rest, false);
                     self.options.backup = Some(value);
                     rest = next;
                 }
                 'g' => {
-                    let (value, next) = parse_bool_prefix(rest, false);
+                    let (value, next) = self.optional_short_bool(rest, false);
                     self.options.global_rc = Some(value);
                     rest = next;
                 }
                 'x' => {
-                    let (value, next) = parse_bool_prefix(rest, false);
+                    let (value, next) = self.optional_short_bool(rest, false);
                     self.options.wipe_verb = Some(value);
                     rest = next;
                 }
                 'I' => {
-                    let (value, next) = parse_bool_prefix(rest, false);
+                    let (value, next) = self.optional_short_bool(rest, false);
                     self.options.input_files = Some(value);
                     rest = next;
                 }
                 'H' => {
-                    let (value, next) = parse_bool_prefix(rest, false);
+                    let (value, next) = self.optional_short_bool(rest, false);
                     self.options.header_errors = Some(value);
                     rest = next;
                 }
                 't' => {
-                    let (_value, next) = parse_bool_prefix(rest, false);
+                    let (_value, next) = self.optional_short_bool(rest, false);
                     rest = next;
                 }
                 _ => return Err(CliError::UnknownOption(format!("-{flag}"))),
@@ -349,6 +350,35 @@ impl Parser {
             .cloned()
             .inspect(|_| self.index += 1)
             .ok_or_else(|| CliError::MissingArgument(format!("-{flag}")))
+    }
+
+    fn optional_short_number<'a>(&mut self, rest: &'a str) -> (Option<i64>, &'a str) {
+        let (value, next) = parse_number_prefix(rest);
+        if value.is_some() || !next.is_empty() {
+            return (value, next);
+        }
+        if let Some(arg) = self.args.get(self.index)
+            && !arg.is_empty()
+            && arg.bytes().all(|byte| byte.is_ascii_digit())
+        {
+            self.index += 1;
+            return (arg.parse().ok(), "");
+        }
+        (None, rest)
+    }
+
+    fn optional_short_bool<'a>(&mut self, rest: &'a str, current: bool) -> (bool, &'a str) {
+        let (value, next) = parse_bool_prefix(rest, current);
+        if !next.is_empty() || parse_number_prefix(rest).0.is_some() {
+            return (value, next);
+        }
+        if let Some(arg) = self.args.get(self.index)
+            && matches!(arg.as_str(), "0" | "1")
+        {
+            self.index += 1;
+            return (arg != "0", "");
+        }
+        (value, next)
     }
 
     fn required_long_arg(
@@ -387,6 +417,26 @@ impl Parser {
         }
         self.options.output = Some(PathBuf::from(value));
         Ok(())
+    }
+
+    fn reset_runtime_options(&mut self) {
+        self.options.action = CliAction::Check;
+        self.options.no_line_suppression = false;
+        self.options.quiet = false;
+        self.options.license = false;
+        self.options.reset = true;
+        self.options.debug_level = None;
+        self.options.verbosity = None;
+        self.options.pipe_verbosity = None;
+        self.options.split_char = None;
+        self.options.output = None;
+        self.options.pseudoname = None;
+        self.options.format = None;
+        self.options.backup = Some(true);
+        self.options.global_rc = Some(true);
+        self.options.wipe_verb = Some(true);
+        self.options.input_files = Some(true);
+        self.options.header_errors = Some(true);
     }
 }
 
@@ -511,6 +561,23 @@ mod tests {
     }
 
     #[test]
+    fn parses_separated_short_bool_values() {
+        let parsed = parse_args(["-g", "0", "-b", "1", "-x", "0", "file.tex"]).unwrap();
+
+        assert_eq!(parsed.global_rc, Some(false));
+        assert_eq!(parsed.backup, Some(true));
+        assert_eq!(parsed.wipe_verb, Some(false));
+        assert_eq!(parsed.files, [PathBuf::from("file.tex")]);
+    }
+
+    #[test]
+    fn parses_license_action() {
+        let parsed = parse_args(["-i"]).unwrap();
+
+        assert_eq!(parsed.action, CliAction::License);
+    }
+
+    #[test]
     fn parses_required_argument_from_next_argv() {
         let parsed = parse_args(["-o", "out.txt", "--localrc", "custom.rc"]).unwrap();
 
@@ -519,10 +586,27 @@ mod tests {
     }
 
     #[test]
+    fn parses_debug_number_from_next_argv() {
+        let parsed = parse_args(["-d", "4", "-STabSize=7"]).unwrap();
+
+        assert_eq!(parsed.debug_level, Some(4));
+        assert_eq!(parsed.rc_overrides, ["TabSize=7"]);
+        assert!(parsed.files.is_empty());
+    }
+
+    #[test]
     fn rejects_duplicate_output() {
         let err = parse_args(["-oone", "--output=two"]).unwrap_err();
 
         assert_eq!(err, CliError::OutputSpecifiedTwice);
+    }
+
+    #[test]
+    fn reset_allows_later_output_option() {
+        let parsed = parse_args(["-oone", "-r", "--output=two"]).unwrap();
+
+        assert!(parsed.reset);
+        assert_eq!(parsed.output, Some(PathBuf::from("two")));
     }
 
     #[test]
