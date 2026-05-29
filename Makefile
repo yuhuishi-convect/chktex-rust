@@ -11,7 +11,10 @@ TOOLS := $(ROOT)/tools
 TARGET := $(ROOT)/target
 CHKTEX := $(TARGET)/debug/chktex
 CHKTEX_RELEASE := $(TARGET)/release/chktex
+CHKTEX_WINDOWS_MSVC := $(TARGET)/x86_64-pc-windows-msvc/release/chktex.exe
+CHKTEX_WINDOWS_GNU := $(TARGET)/x86_64-pc-windows-gnu/release/chktex.exe
 ORACLE_ENV := $(TARGET)/oracle.env
+WINDOWS_FLAVOR ?= msvc
 
 # Upstream oracle paths (overridable; see tools/setup-oracle.sh)
 CHKTEX_UPSTREAM_PARENT ?= /tmp/chktex-upstream
@@ -21,7 +24,7 @@ TEST_TEX ?= $(CHKTEX_UPSTREAM_DIR)/Test.tex
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build release run check test test-core test-cli \
+.PHONY: help build release release-windows package-windows run check test test-core test-cli \
         oracle-setup oracle-setup-tests install-oracle-env \
         oracle oracle-tests diff diff-warnings \
         fmt fmt-check clippy clean
@@ -35,6 +38,8 @@ help: ## Show available targets
 	@printf "\nExamples:\n"
 	@printf "  make test\n"
 	@printf "  make oracle-setup oracle-tests\n"
+	@printf "  make release-windows\n"
+	@printf "  make release-windows WINDOWS_FLAVOR=gnu\n"
 	@printf "  make diff-warnings TEST_TEX=\$$CHKTEX_UPSTREAM_DIR/Test.tex\n"
 
 build: ## Build debug chktex binary
@@ -42,6 +47,18 @@ build: ## Build debug chktex binary
 
 release: ## Build optimized release chktex binary
 	$(CARGO) build --release -p chktex-cli
+
+release-windows: ## Cross-compile chktex.exe for Windows (WINDOWS_FLAVOR=msvc|gnu)
+	$(TOOLS)/cross-windows.sh $(WINDOWS_FLAVOR)
+
+package-windows: release-windows ## Build Windows binary and stage chktex.exe + chktexrc
+	@out="$(TARGET)/windows-$(WINDOWS_FLAVOR)"; \
+	bin="$(if $(filter gnu,$(WINDOWS_FLAVOR)),$(CHKTEX_WINDOWS_GNU),$(CHKTEX_WINDOWS_MSVC))"; \
+	rm -rf "$$out"; \
+	mkdir -p "$$out"; \
+	cp "$$bin" "$$out/chktex.exe"; \
+	cp tests/fixtures/upstream/chktexrc "$$out/chktexrc"; \
+	printf "Packaged %s\n" "$$out"
 
 run: build ## Run chktex on a file (FILE=path/to/doc.tex)
 	@test -n "$(FILE)" || { echo "error: set FILE=path/to/doc.tex"; exit 1; }

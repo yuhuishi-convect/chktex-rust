@@ -1,1 +1,57 @@
+# Rust / Cargo
 /target/
+**/*.rs.bk
+
+# Cross-compilation tool caches (cargo-zigbuild, etc.)
+.cache/
+
+# Local Cargo overrides (keep .cargo/config.toml tracked)
+.cargo/config.local.toml
+
+# chktex runtime artifacts
+*.bak
+
+# Integration test output (expected files like *.expected stay tracked)
+tests/**/*.out
+
+# Coverage / profiling
+/coverage/
+*.profraw
+*.profdata
+*.gcno
+*.gcda
+lcov.info
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini
+
+# Local environment / secrets
+.env
+.env.*
+!.env.example
+
+# Debug scratch from oracle test failures (also under target/, kept for clarity)
+oracle.stdout
+oracle.stderr
+rust.stdout
+rust.stderr
+
+# Temporary diff output from tools/diff-warnings.sh when run locally in-repo
+upstream-warnings.tmp
+rust-warnings.tmp
+rust-out.txt
+oracle-out.txt
