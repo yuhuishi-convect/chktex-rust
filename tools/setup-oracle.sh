@@ -214,6 +214,7 @@ main() {
     build_oracle
     write_env_file
     verify_oracle
+    "$ROOT/tools/generate-upstream-config-fixtures.sh" "$BUILD_DIR"
     print_next_steps
 
     if [[ "$RUN_TESTS" -eq 1 ]]; then

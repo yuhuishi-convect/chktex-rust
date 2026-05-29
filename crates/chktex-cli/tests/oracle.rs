@@ -93,38 +93,31 @@ fn upstream_inclusion_fixture_matches_expected() {
 fn upstream_config_lookup_fixture_matches_oracle() {
     let oracle = oracle_path();
     let upstream_dir = upstream_dir();
+    ensure_upstream_config_fixtures(&upstream_dir);
     let fixture_input = b"%\n";
     let sub_config = upstream_dir.join("tests/sub");
 
-    let c_output = Command::new(&oracle)
-        .args(["-mall", "-v0", "-q"])
-        .env("XDG_CONFIG_HOME", &sub_config)
-        .env_remove("HOME")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            child.stdin.as_mut().unwrap().write_all(fixture_input)?;
-            child.wait_with_output()
-        })
-        .expect("run oracle config lookup fixture");
+    let c_output = run_with_stdin(
+        &oracle,
+        |command| {
+            command
+                .args(["-mall", "-v0", "-q"])
+                .env("XDG_CONFIG_HOME", &sub_config)
+                .env_remove("HOME");
+        },
+        fixture_input,
+    );
 
-    let rust_output = Command::new(env!("CARGO_BIN_EXE_chktex"))
-        .args(["-mall", "-v0", "-q"])
-        .env("XDG_CONFIG_HOME", &sub_config)
-        .env_remove("HOME")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            child.stdin.as_mut().unwrap().write_all(fixture_input)?;
-            child.wait_with_output()
-        })
-        .expect("run rust config lookup fixture");
+    let rust_output = run_with_stdin(
+        env!("CARGO_BIN_EXE_chktex"),
+        |command| {
+            command
+                .args(["-mall", "-v0", "-q"])
+                .env("XDG_CONFIG_HOME", &sub_config)
+                .env_remove("HOME");
+        },
+        fixture_input,
+    );
 
     assert_outputs_equal(&c_output, &rust_output);
 
@@ -1670,6 +1663,50 @@ fn rust_binary_version_and_help_match_upstream_shape() {
 
 // ====== Helpers ======
 
+fn ensure_upstream_config_fixtures(upstream_dir: &Path) {
+    let tests = upstream_dir.join("tests");
+    let write = |path: &Path, body: &str| {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create upstream config fixture dir");
+        }
+        fs::write(path, body).expect("write upstream config fixture");
+    };
+
+    write(
+        &tests.join("sub/chktexrc"),
+        "OutFormat\n{\n\"loaded chktex/tests/sub %f!n\"\n}\n",
+    );
+    write(
+        &tests.join("sub1/.config/chktexrc"),
+        "OutFormat\n{\n\"loaded chktex/tests/sub1/.config/chktexrc %f!n\"\n}\n",
+    );
+    write(
+        &tests.join("sub2/.chktexrc"),
+        "OutFormat\n{\n\"loaded chktex/tests/sub2/.chktexrc %f!n\"\n}\n",
+    );
+}
+
+fn run_with_stdin<F>(program: impl AsRef<OsStr>, setup: F, input: &[u8]) -> Output
+where
+    F: FnOnce(&mut Command),
+{
+    use std::io::Write;
+
+    let mut command = Command::new(program.as_ref());
+    setup(&mut command);
+    command
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    let mut child = command.spawn().expect("spawn process with stdin");
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(input);
+    }
+    child
+        .wait_with_output()
+        .expect("wait for process with stdin")
+}
+
 fn oracle_path() -> PathBuf {
     std::env::var_os("CHKTEX_ORACLE")
         .map(PathBuf::from)
@@ -1694,9 +1731,7 @@ fn upstream_dir() -> PathBuf {
             path.is_dir().then_some(path)
         })
         .unwrap_or_else(|| {
-            panic!(
-                "Set CHKTEX_UPSTREAM_DIR to an upstream checkout, or use {DEFAULT_UPSTREAM_DIR}"
-            )
+            panic!("Set CHKTEX_UPSTREAM_DIR to an upstream checkout, or use {DEFAULT_UPSTREAM_DIR}")
         })
 }
 
@@ -1751,7 +1786,9 @@ fn run_rust_config_probe(
         .spawn()
         .and_then(|mut child| {
             use std::io::Write;
-            child.stdin.as_mut().unwrap().write_all(input)?;
+            if let Some(mut stdin) = child.stdin.take() {
+                let _ = stdin.write_all(input);
+            }
             child.wait_with_output()
         })
         .expect("run rust config lookup fixture")
