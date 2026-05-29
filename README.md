@@ -1,5 +1,7 @@
 # ChkTeX (Rust)
 
+[![CI](https://github.com/yuhuishi-convect/chktex-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/yuhuishi-convect/chktex-rust/actions/workflows/ci.yml)
+
 A Rust rewrite of [ChkTeX](https://www.nongnu.org/chktex/), the LaTeX semantic checker. The goal is a self-contained, cross-platform `chktex` binary that preserves upstream CLI behavior, warning numbers, `.chktexrc` format, output formatting, and exit codes.
 
 This project tracks upstream ChkTeX 1.7.x compatibility using differential tests against the legacy C implementation.
@@ -71,6 +73,25 @@ make diff-warnings
 
 See [docs/compatibility.md](docs/compatibility.md) for the TDD baseline, audited upstream commit, and known gaps.
 
+## CI and releases
+
+GitHub Actions runs on every push and pull request:
+
+- `fmt` · `clippy` · workspace tests
+- Release builds on Linux, macOS, and Windows
+- Upstream oracle compatibility suite (Linux)
+
+Create a release by pushing a version tag:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+That builds archives for Linux (x86_64 and aarch64), Windows (x86_64), and macOS (Apple Silicon), then publishes them to GitHub Releases. Each archive contains the binary, default `chktexrc`, `LICENSE`, and `README.md`.
+
+Manual release (workflow dispatch): run the **Release** workflow from the Actions tab and provide a tag such as `v0.1.0` (the tag must already exist on the branch).
+
 ## Cross-compilation (Windows)
 
 From Linux, build a Windows `.exe` with the MSVC target (recommended):
@@ -133,6 +154,7 @@ Run `make` or `make help` for the full list. Common targets:
 | `oracle-tests` | Run differential oracle suite |
 | `release-windows` | Cross-compile `chktex.exe` |
 | `package-windows` | Stage exe + default `chktexrc` |
+| `package-release` | Create release archive (see `tools/package-release.sh`) |
 | `clippy` / `fmt` | Lint and format |
 
 ## Optional features

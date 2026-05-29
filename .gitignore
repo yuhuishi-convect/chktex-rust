@@ -1,5 +1,6 @@
 # Rust / Cargo
 /target/
+/dist/
 **/*.rs.bk
 
 # Cross-compilation tool caches (cargo-zigbuild, etc.)
