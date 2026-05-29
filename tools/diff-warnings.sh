@@ -4,13 +4,15 @@
 
 set -euo pipefail
 
-TESTFILE="${1:-tests/fixtures/upstream/Test.tex}"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$ROOT/tools/oracle-env.sh"
+
+TESTFILE="${1:-$CHKTEX_UPSTREAM_DIR/Test.tex}"
 RCFILE="tests/fixtures/upstream/chktexrc"
-ORACLE="${CHKTEX_ORACLE:-/tmp/chktex-upstream/chktex/chktex}"
-UPSTREAM_DIR="${CHKTEX_UPSTREAM_DIR:-/tmp/chktex-upstream/chktex}"
 
 echo "=== Extracting warnings per line from upstream ==="
-"$ORACLE" -mall -r -g0 -l "$RCFILE" -v5 -q "$TESTFILE" 2>/dev/null \
+"$CHKTEX_ORACLE" -mall -r -g0 -l "$RCFILE" -v5 -q "$TESTFILE" 2>/dev/null \
   | grep "^Message\|^Warning\|^Error" \
   | sed 's/.*line \([0-9]*\):.*/\1/' \
   > /tmp/upstream-warnings.tmp
@@ -43,5 +45,5 @@ echo "Rust:     $(wc -l < /tmp/rust-warnings.tmp)"
 echo ""
 echo "=== Full diff output ==="
 cargo run -- -mall -r -g0 -l "$RCFILE" -v5 -q "$TESTFILE" 2>/dev/null > /tmp/rust-out.txt
-"$ORACLE" -mall -r -g0 -l "$RCFILE" -v5 -q "$TESTFILE" 2>/dev/null > /tmp/oracle-out.txt
+"$CHKTEX_ORACLE" -mall -r -g0 -l "$RCFILE" -v5 -q "$TESTFILE" 2>/dev/null > /tmp/oracle-out.txt
 diff /tmp/oracle-out.txt /tmp/rust-out.txt 2>&1 | head -50

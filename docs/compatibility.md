@@ -29,7 +29,20 @@ patterns.
 
 ## TDD Loop
 
-Use oracle tests to capture upstream behavior before changing implementation:
+Build the upstream oracle once:
+
+```sh
+./tools/setup-oracle.sh
+source target/oracle.env
+```
+
+Then run differential tests:
+
+```sh
+./tools/run-oracle-tests.sh
+```
+
+Or manually:
 
 ```sh
 CHKTEX_ORACLE=/tmp/chktex-upstream/chktex/chktex/chktex \
@@ -45,7 +58,7 @@ acceptance target, but it is too large for first diagnosis.
 Current green gates:
 
 - `cargo test -q`
-- `CHKTEX_ORACLE=/tmp/chktex-upstream/chktex/chktex/chktex CHKTEX_UPSTREAM_DIR=/tmp/chktex-upstream/chktex/chktex cargo test -p chktex-cli --test oracle -- --ignored --nocapture`
+- `./tools/setup-oracle.sh --run-tests`
 
 The ignored oracle suite currently covers:
 

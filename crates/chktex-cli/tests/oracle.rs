@@ -7,8 +7,11 @@ use std::{
 };
 
 /// Integration test comparing Rust chktex output against the upstream C binary.
-/// These tests require the CHKTEX_ORACLE and CHKTEX_UPSTREAM_DIR environment variables
-/// to be set (see the oracle test for details).
+///
+/// Set `CHKTEX_ORACLE` and `CHKTEX_UPSTREAM_DIR`, or run `tools/setup-oracle.sh`
+/// to clone/build upstream and write `target/oracle.env`.
+const DEFAULT_ORACLE: &str = "/tmp/chktex-upstream/chktex/chktex/chktex";
+const DEFAULT_UPSTREAM_DIR: &str = "/tmp/chktex-upstream/chktex/chktex";
 
 #[test]
 #[ignore = "requires CHKTEX_ORACLE pointing at an upstream C chktex binary"]
@@ -1671,14 +1674,30 @@ fn oracle_path() -> PathBuf {
     std::env::var_os("CHKTEX_ORACLE")
         .map(PathBuf::from)
         .filter(|path| path.is_file())
-        .expect("CHKTEX_ORACLE must point at an upstream C chktex binary")
+        .or_else(|| {
+            let path = PathBuf::from(DEFAULT_ORACLE);
+            path.is_file().then_some(path)
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "Set CHKTEX_ORACLE to an upstream C chktex binary, or build one at {DEFAULT_ORACLE}"
+            )
+        })
 }
 
 fn upstream_dir() -> PathBuf {
     std::env::var_os("CHKTEX_UPSTREAM_DIR")
         .map(PathBuf::from)
         .filter(|path| path.is_dir())
-        .expect("CHKTEX_UPSTREAM_DIR must point at an upstream chktex source/build directory")
+        .or_else(|| {
+            let path = PathBuf::from(DEFAULT_UPSTREAM_DIR);
+            path.is_dir().then_some(path)
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "Set CHKTEX_UPSTREAM_DIR to an upstream checkout, or use {DEFAULT_UPSTREAM_DIR}"
+            )
+        })
 }
 
 fn unique_suffix() -> u128 {
