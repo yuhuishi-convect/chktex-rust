@@ -1408,9 +1408,19 @@ fn find_next_input_command(line: &[u8]) -> Option<(usize, &'static [u8])> {
         .filter_map(|command| {
             line.windows(command.len())
                 .position(|window| window == command)
+                .filter(|&pos| is_complete_input_command(line, pos + command.len()))
                 .map(|pos| (pos, command))
         })
         .min_by_key(|(pos, _)| *pos)
+}
+
+/// True when the byte after a matched `\input` / `\include` command name is not
+/// another letter (i.e. the match is not a prefix of `\includegraphics`, etc.).
+fn is_complete_input_command(line: &[u8], after_command: usize) -> bool {
+    match line.get(after_command) {
+        None => true,
+        Some(byte) => !byte.is_ascii_alphabetic(),
+    }
 }
 
 fn parse_input_arg(line: &[u8], mut pos: usize) -> Option<(Vec<u8>, usize)> {
@@ -1770,3 +1780,53 @@ main documentation ChkTeX.dvi, ChkTeX.ps or ChkTeX.pdf:
 Any of the above arguments can be made permanent by setting them in the
 chktexrc file (~/.chktexrc).
 ";
+
+#[cfg(test)]
+mod input_target_tests {
+    use super::{input_targets, is_complete_input_command};
+
+    #[test]
+    fn rejects_includegraphics_as_include() {
+        let line = br"\includegraphics[width=0.6]{Figures/ModalNet-21}";
+        assert!(input_targets(line).is_empty());
+    }
+
+    #[test]
+    fn rejects_includeonly_as_include() {
+        let line = br"\includeonly{chapter1,chapter2}";
+        assert!(input_targets(line).is_empty());
+    }
+
+    #[test]
+    fn accepts_include_with_braces() {
+        let line = br"\include{sections/intro}";
+        let targets = input_targets(line);
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].to_string_lossy(), "sections/intro");
+    }
+
+    #[test]
+    fn accepts_input_with_braces() {
+        let line = br"  \input{macros/preamble} % comment";
+        let targets = input_targets(line);
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].to_string_lossy(), "macros/preamble");
+    }
+
+    #[test]
+    fn accepts_include_with_space_arg() {
+        let line = br"\include chapter1";
+        let targets = input_targets(line);
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].to_string_lossy(), "chapter1");
+    }
+
+    #[test]
+    fn command_boundary_requires_non_letter_suffix() {
+        assert!(is_complete_input_command(br"\include{file}", br"\include".len()));
+        assert!(!is_complete_input_command(
+            br"\includegraphics{x}",
+            br"\include".len()
+        ));
+    }
+}
