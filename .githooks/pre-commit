@@ -1,0 +1,23 @@
+#!/bin/bash
+# Auto-format Rust sources before each commit.
+
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+
+if ! command -v cargo >/dev/null 2>&1; then
+    echo "pre-commit: cargo not found; skipping rustfmt" >&2
+    exit 0
+fi
+
+echo "pre-commit: running cargo fmt --all"
+cargo fmt --all
+
+mapfile -t formatted < <(git diff --name-only -- '*.rs')
+if ((${#formatted[@]} > 0)); then
+    printf 'pre-commit: re-staging formatted files\n'
+    git add -- "${formatted[@]}"
+fi
+
+exit 0

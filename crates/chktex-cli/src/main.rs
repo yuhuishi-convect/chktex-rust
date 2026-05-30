@@ -1823,7 +1823,10 @@ mod input_target_tests {
 
     #[test]
     fn command_boundary_requires_non_letter_suffix() {
-        assert!(is_complete_input_command(br"\include{file}", br"\include".len()));
+        assert!(is_complete_input_command(
+            br"\include{file}",
+            br"\include".len()
+        ));
         assert!(!is_complete_input_command(
             br"\includegraphics{x}",
             br"\include".len()

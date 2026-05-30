@@ -24,7 +24,7 @@ TEST_TEX ?= $(CHKTEX_UPSTREAM_DIR)/Test.tex
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build release release-windows package-windows package-release run check test test-core test-cli \
+.PHONY: help build release release-windows package-windows package-release setup-hooks run check test test-core test-cli \
         oracle-setup oracle-setup-tests install-oracle-env \
         oracle oracle-tests diff diff-warnings \
         fmt fmt-check clippy clean
@@ -63,6 +63,9 @@ package-windows: release-windows ## Build Windows binary and stage chktex.exe + 
 package-release: release ## Create release tarball for native target (NAME=chktex-0.1.0-x86_64-unknown-linux-gnu)
 	@test -n "$(NAME)" || { echo "error: set NAME=chktex-<version>-<target-triple>"; exit 1; }
 	$(TOOLS)/package-release.sh $(CHKTEX_RELEASE) $(NAME)
+
+setup-hooks: ## Enable pre-commit rustfmt hook (.githooks/pre-commit)
+	$(TOOLS)/setup-git-hooks.sh
 
 run: build ## Run chktex on a file (FILE=path/to/doc.tex)
 	@test -n "$(FILE)" || { echo "error: set FILE=path/to/doc.tex"; exit 1; }
