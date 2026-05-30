@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ChkTeX WASM demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        margin: 2rem auto;
+        max-width: 960px;
+        padding: 0 1rem;
+      }
+      textarea {
+        width: 100%;
+        min-height: 14rem;
+        font-family: ui-monospace, monospace;
+        font-size: 14px;
+      }
+      pre {
+        background: #111;
+        color: #eee;
+        padding: 1rem;
+        overflow: auto;
+        white-space: pre-wrap;
+        border-radius: 6px;
+      }
+      .toolbar {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        margin: 0.75rem 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+      th,
+      td {
+        border-bottom: 1px solid #ccc4;
+        padding: 0.35rem 0.5rem;
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ChkTeX in the browser</h1>
+    <p>
+      Uses the JS integration layer in
+      <code>integrations/browser/chktex.js</code> over the wasm-bindgen
+      package in <code>pkg/</code>. Build first:
+      <code>./tools/build-wasm.sh</code>, then serve the repo root
+      (for example <code>python -m http.server 8000</code>).
+    </p>
+    <label for="source">LaTeX source</label>
+    <textarea id="source">\documentclass{article}
+\begin{document}
+\foo bad spacing here
+\end{document}
+</textarea>
+    <div class="toolbar">
+      <button id="run" type="button">Lint</button>
+      <span id="meta"></span>
+    </div>
+    <h2>Diagnostics</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Line</th>
+          <th>Col</th>
+          <th>Kind</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody id="diagnostics"></tbody>
+    </table>
+    <h2>Formatted output</h2>
+    <pre id="output">(waiting)</pre>
+    <script type="module">
+      import {
+        initChktex,
+        lint,
+        toEditorMarkers,
+      } from "../../integrations/browser/chktex.js";
+
+      const output = document.getElementById("output");
+      const diagnostics = document.getElementById("diagnostics");
+      const source = document.getElementById("source");
+      const run = document.getElementById("run");
+      const meta = document.getElementById("meta");
+
+      const { version } = await initChktex();
+      meta.textContent = `ChkTeX WASM ${version()}`;
+
+      run.addEventListener("click", async () => {
+        output.textContent = "Linting…";
+        diagnostics.innerHTML = "";
+        try {
+          const result = await lint(source.value, { filename: "main.tex" });
+          meta.textContent = `ChkTeX WASM ${version()} — exit ${result.exitStatus}, ${result.warnings} warning(s), ${result.errors} error(s)`;
+          output.textContent = result.output || "(no output)";
+
+          for (const diag of result.diagnostics) {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+              <td>${diag.number}</td>
+              <td>${diag.line}</td>
+              <td>${diag.column}</td>
+              <td>${diag.kind}</td>
+              <td>${diag.message}</td>`;
+            diagnostics.appendChild(row);
+          }
+
+          // Example editor interop payload (Monaco / VS Code marker shape)
+          console.debug("editor markers", toEditorMarkers(result.diagnostics));
+        } catch (err) {
+          output.textContent = String(err);
+        }
+      });
+    </script>
+  </body>
+</html>

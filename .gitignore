@@ -1,6 +1,9 @@
 # Rust / Cargo
 /target/
 /dist/
+/pkg/
+/pkg-node/
+/integrations/browser/node_modules/
 **/*.rs.bk
 
 # Cross-compilation tool caches (cargo-zigbuild, etc.)

@@ -124,22 +124,87 @@ Requires `mingw-w64-gcc` (e.g. `sudo pacman -S mingw-w64-gcc` on Arch).
 crates/
   chktex-core/   Library: lexer, checker, .chktexrc parser, diagnostics
   chktex-cli/    `chktex` executable and oracle integration tests
+  chktex-wasm/   Browser/WASM bindings (wasm-bindgen)
 tests/fixtures/  Upstream-derived fixtures (chktexrc, inclusion tests)
+examples/wasm/   Browser demo page
 tools/           Oracle setup, cross-build scripts, diff helpers
 docs/            Compatibility notes and TDD baseline
 ```
 
+## WebAssembly / browser
+
+`chktex-core` builds for `wasm32-unknown-unknown`. The `chktex-wasm` crate exposes
+typed JavaScript bindings (via wasm-bindgen) for linting a LaTeX buffer in the browser
+(no filesystem or `\input` resolution in this mode).
+
+Build WASM packages:
+
+```sh
+cargo install wasm-pack   # once
+make build-wasm           # writes pkg/ (browser) and pkg-node/ (Node tests)
+make test-wasm            # build + run JS integration smoke tests
+```
+
+Try the demo:
+
+```sh
+python -m http.server 8000
+# open http://localhost:8000/examples/wasm/index.html
+```
+
+### JS integration layer
+
+`integrations/browser/chktex.js` wraps the raw wasm-bindgen glue with a small API:
+
+```javascript
+import { initChktex, lint, lintBytes, toEditorMarkers } from "./integrations/browser/chktex.js";
+
+await initChktex();
+const result = await lint("\\foo x", { filename: "main.tex" });
+// result.diagnostics, result.output, result.exitStatus, result.warnings, result.errors
+
+const markers = toEditorMarkers(result.diagnostics); // Monaco / VS Code shape
+```
+
+Options for `lint` / `lintBytes`:
+
+- `filename` — virtual path shown in diagnostics (default `main.tex`)
+- `chktexrc` — custom `.chktexrc` text, or omit/`null` for embedded defaults
+- `verbosity` — ChkTeX `-vN` output format index (default `2`)
+
+For bundlers or Node tests, point at a specific glue build:
+
+```javascript
+await initChktex({ pkgUrl: new URL("../../pkg-node/chktex_wasm.js", import.meta.url).href });
+```
+
+TypeScript types: `integrations/browser/chktex.d.ts`.
+
+GitHub Releases include a `chktex-wasm-{version}.tar.gz` browser bundle (`pkg/`, JS wrapper, demo). Extract, serve over HTTP, and open `example.html` — see `WASM.md` inside the archive.
+
+### Low-level wasm-bindgen API
+
+After `await init()` from `pkg/chktex_wasm.js`:
+
+```javascript
+import init, { check, checkBytes, version, defaultChktexrc } from "./pkg/chktex_wasm.js";
+
+await init();
+const result = check("\\foo x", "main.tex", undefined);
+// result.diagnostics (CheckDiagnostic[]), result.output, result.exitStatus
+result.toJSON(); // optional JSON string
+```
+
+Custom `.chktexrc` text can be passed as the third argument instead of `undefined`.
+
 ## Library usage
 
 ```rust
-use chktex_core::{
-    checker::{check_document, CheckerConfig},
-    resource::{parse_resource, ResourceSet},
-};
+use chktex_core::session::{check_buffer, default_resources, CheckOptions};
 
-let resources = ResourceSet::default();
-let config = CheckerConfig::from_resources(&resources);
-let diagnostics = check_document("doc.tex", br"\documentclass{article}", &config);
+let resources = default_resources();
+let result = check_buffer("doc.tex", br"\documentclass{article}", &resources, &CheckOptions::default());
+// result.diagnostics, result.formatted, result.summary
 ```
 
 ## Makefile targets
@@ -155,6 +220,9 @@ Run `make` or `make help` for the full list. Common targets:
 | `release-windows` | Cross-compile `chktex.exe` |
 | `package-windows` | Stage exe + default `chktexrc` |
 | `package-release` | Create release archive (see `tools/package-release.sh`) |
+| `build-wasm` | Build browser and Node WASM packages (`pkg/`, `pkg-node/`) |
+| `test-wasm` | Build WASM and run JS integration smoke tests |
+| `package-wasm-release` | Create browser WASM release tarball (`NAME=chktex-wasm-0.1.1`) |
 | `clippy` / `fmt` | Lint and format |
 
 ## Optional features

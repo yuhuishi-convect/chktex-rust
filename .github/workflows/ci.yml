@@ -74,3 +74,24 @@ jobs:
 
       - name: Build upstream oracle and run differential tests
         run: ./tools/setup-oracle.sh --run-tests
+
+  wasm:
+    name: wasm integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Build web and node WASM packages
+        run: ./tools/build-wasm.sh
+
+      - name: Run JS<>WASM integration tests
+        run: cd integrations/browser && node --test test/smoke.test.mjs

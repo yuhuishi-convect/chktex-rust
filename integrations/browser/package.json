@@ -1,0 +1,16 @@
+{
+  "name": "@chktex-rust/browser",
+  "version": "0.1.1",
+  "description": "Browser integration for the ChkTeX Rust WASM linter",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./chktex.d.ts",
+      "default": "./chktex.js"
+    }
+  },
+  "scripts": {
+    "test": "node --test test/smoke.test.mjs"
+  }
+}

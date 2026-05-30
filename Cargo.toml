@@ -2,6 +2,7 @@
 members = [
     "crates/chktex-core",
     "crates/chktex-cli",
+    "crates/chktex-wasm",
 ]
 resolver = "3"
 

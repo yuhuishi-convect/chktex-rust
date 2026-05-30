@@ -1,0 +1,22 @@
+[package]
+name = "chktex-wasm"
+version = "0.1.1"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "WebAssembly bindings for ChkTeX (browser and WASI hosts)"
+readme = "../../README.md"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+chktex-core = { path = "../chktex-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wasm-bindgen = "0.2"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[package.metadata.wasm-pack.profile.release]

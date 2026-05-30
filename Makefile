@@ -24,7 +24,7 @@ TEST_TEX ?= $(CHKTEX_UPSTREAM_DIR)/Test.tex
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build release release-windows package-windows package-release setup-hooks run check test test-core test-cli \
+.PHONY: help build release release-windows package-windows package-release build-wasm test-wasm package-wasm-release setup-hooks run check test test-core test-cli \
         oracle-setup oracle-setup-tests install-oracle-env \
         oracle oracle-tests diff diff-warnings \
         fmt fmt-check clippy clean
@@ -66,6 +66,16 @@ package-release: release ## Create release tarball for native target (NAME=chkte
 
 setup-hooks: ## Enable pre-commit rustfmt hook (.githooks/pre-commit)
 	$(TOOLS)/setup-git-hooks.sh
+
+build-wasm: ## Build browser + node WASM packages (requires wasm-pack)
+	$(TOOLS)/build-wasm.sh
+
+test-wasm: build-wasm ## Run JS<>WASM integration smoke tests (Node)
+	cd integrations/browser && node --test test/smoke.test.mjs
+
+package-wasm-release: build-wasm ## Create browser WASM release tarball (NAME=chktex-wasm-0.1.1)
+	@test -n "$(NAME)" || { echo "error: set NAME=chktex-wasm-<version>"; exit 1; }
+	$(TOOLS)/package-wasm-release.sh $(NAME)
 
 run: build ## Run chktex on a file (FILE=path/to/doc.tex)
 	@test -n "$(FILE)" || { echo "error: set FILE=path/to/doc.tex"; exit 1; }

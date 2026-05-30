@@ -89,9 +89,50 @@ jobs:
           path: ${{ env.ARCHIVE }}
           if-no-files-found: error
 
+  wasm:
+    name: wasm-browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Build WASM packages
+        run: ./tools/build-wasm.sh
+
+      - name: Run JS integration smoke tests
+        run: cd integrations/browser && node --test test/smoke.test.mjs
+
+      - name: Package browser release archive
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$VERSION" == "$GITHUB_REF_NAME" ]]; then
+            VERSION="${{ inputs.tag }}"
+            VERSION="${VERSION#v}"
+          fi
+          if [[ -z "$VERSION" ]]; then
+            VERSION=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[] | select(.name=="chktex-wasm") | .version')
+          fi
+          chmod +x tools/package-wasm-release.sh
+          ARCHIVE=$(./tools/package-wasm-release.sh "chktex-wasm-${VERSION}")
+          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm-browser
+          path: ${{ env.ARCHIVE }}
+          if-no-files-found: error
+
   publish:
     name: publish GitHub release
-    needs: build
+    needs: [build, wasm]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
